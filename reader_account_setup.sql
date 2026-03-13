@@ -1,0 +1,81 @@
+-- Steps to follow when creating a Reader account to allow other user to query some data
+-- 1. Execute this in your ACCOUNT to create the Reader Account with login credentials
+
+USER ROLE ACCOUNTADMIN;
+
+CREATE MANAGED ACCOUNT reader_user_sql
+ADMIN_NAME = 'user'
+ADMIN_PASSWORD = 'UserSQL12345678'
+TYPE = READER;
+
+-- 2. Check it´s done
+SHOW MANAGED ACCOUNTS;
+
+-- 3. Create and populate the database you want to share
+CREATE OR REPLACE DATABASE SHARED_DB;
+USE SCHEMA SHARED_DB.PUBLIC;
+
+CREATE OR REPLACE TABLE SHARED_DB.PUBLIC.CUSTOMER AS
+SELECT * FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER;
+
+CREATE OR REPLACE TABLE SHARED_DB.PUBLIC.LINEITEM AS
+SELECT * FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.LINEITEM;
+
+CREATE OR REPLACE TABLE SHARED_DB.PUBLIC.NATION AS
+SELECT * FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.NATION;
+
+CREATE OR REPLACE TABLE SHARED_DB.PUBLIC.ORDERS AS
+SELECT * FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.ORDERS;
+
+CREATE OR REPLACE TABLE SHARED_DB.PUBLIC.REGION
+SELECT * FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.REGION;
+
+CREATE OR REPLACE TABLE SHARED_DB.PUBLIC.PART 
+SELECT * FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.PART;
+
+CREATE OR REPLACE TABLE SHARED_DB.PUBLIC.SUPPLIER
+SELECT * FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.SUPPLIER;
+
+CREATE OR REPLACE TABLE SHARED_DB.PUBLIC.PARTSUPP
+SELECT * FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.PARTSUPP;
+
+-- 4. Create the Share
+CREATE SHARE sample_data_shared;
+
+-- 5. Grant permissions to Share
+GRANT USAGE ON DATABASE SHARED_DB TO SHARE sample_data_shared;
+
+GRANT USAGE ON SCHEMA SHARED_DB.PUBLIC TO SHARE sample_data_shared;
+
+GRANT SELECT ON ALL TABLES IN SCHEMA SHARED_DB.PUBLIC 
+TO SHARE sample_data;
+
+GRANT SELECT ON FUTURE TABLES IN SCHEMA SHARED_DB.PUBLIC
+TO SHARE sample_data;
+
+-- 6. Add Reader account to Share
+--execute the SHOW MANAGED ACCOUNTS command and add the account locator to the ALTER SHARE command (like JTB07742)
+
+SHOW MANAGED ACCOUNTS; 
+
+ALTER SHARE sample_data
+ADD ACCOUNTS = <reader_account_locator>;
+
+-- 7. Go to the Reader Account and setup Warehouse
+CREATE WAREHOUSE reader_wh
+WAREHOUSE_SIZE = 'XSMALL'
+AUTO_SUSPEND = 60;
+
+-- 8. Go to External Sharing in the Reader Account. There you will see the Share available to import. Import the database as sample_data
+USE DATABASE sample_data;
+SHOW TABLES;
+
+-- 9. Create Database Role and Import privileges from the Shared Database to that role
+CREATE ROLE data_reader_role;
+
+GRANT IMPORTED PRIVILEGES
+ON DATABASE sample_data
+TO ROLE data_reader_role;
+
+-- 10. Query some data
+SELECT * FROM CUSTOMER LIMIT 10;
